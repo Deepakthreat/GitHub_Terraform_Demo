@@ -54,7 +54,7 @@ jobs:
           node ./parser/main.js
 
       - name: Store logs results as Build Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: assets-for-download
           path: ./logs/
