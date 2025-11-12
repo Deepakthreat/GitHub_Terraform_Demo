@@ -1,0 +1,57 @@
+name: ‘IAC Assist Terraform Action’  
+on:  
+workflow_dispatch:  
+inputs:  
+GitHub Environment Variables  
+Inside of GitHub you will need to configure the following CI/CD variables for use by their runners or the above YAML script:  
+ThreatModeler’s GitHub action will be pulled from GitHub repository on runtime. Make sure GitHub is accessible from GitHub   
+CI/CD.  
+2. The following YAML may be used to kick off ThreatModeler’s IAC Assist Terraform action:  
+DRAFT
+v2.1  
+reason:  
+description: ‘Do you want to process all files?’ required: false  
+default: ‘Yes - All Files’ type: choice  
+options:  
+- Yes - All Files  
+- No - Only Last Commit Files  
+push:  
+branches: [ master,main ]  
+jobs:  
+analysis:  
+permissions: write-all  
+runs-on: ubuntu-latest  
+steps:  
+- name: checkout version  
+uses: actions/checkout@v2  
+- name: Use Node  
+uses: actions/setup-node@v3  
+with:  
+node-version: 18  
+- name: Clone parser repo  
+uses: actions/checkout@v2  
+with:  
+repository: threatModeler/GitLabCLI  
+token: ${{ secrets.PAT_TOKEN }}  
+path: parser  
+ref: github  
+- name: Get all changed files  
+id: changed-files  
+uses: tj-actions/changed-files@v36  
+with:  
+separator: “,” json: true  
+write_output_files: true  
+- name: Update env  
+run: |  
+echo “CHANGED_FILES=${{ steps.changed-files.outputs.all_modified_files }}” >> “$GITHUB_ENV”  
+echo “FULL_SCAN=${{ github.event.inputs.reason != ‘No - Only Last Commit Files’ }}” >> “$GITHUB_ENV”   
+echo “API_KEY=${{ secrets.TMIAC_API_KEY }}” >> “$GITHUB_ENV”  
+echo “BASE_URL=${{ secrets.BASE_URL }}” >> “$GITHUB_ENV”  
+- name: Run parser  
+run: |  
+node ./parser/main.js  
+- name: Store logs results as Build Artifact  
+uses: actions/upload-artifact@v2  
+with:  
+name: assets-for-download  
+path: ./logs/  
