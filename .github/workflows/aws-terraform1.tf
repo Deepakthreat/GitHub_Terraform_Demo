@@ -1,5 +1,5 @@
 variable "key_name" {
-  description = "Name of the SSH keypair to use in AWS."
+  description = "Name of the SSH keypair to use in AWS1."
 }
 
 variable "aws_region" {
@@ -237,3 +237,4 @@ resource "aws_instance" "web" {
   }
 }
 key_name = "terraform-aws-provider-example"
+
