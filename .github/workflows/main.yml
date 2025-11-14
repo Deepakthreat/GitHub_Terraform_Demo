@@ -5,7 +5,7 @@ on:
       reason:
         description: 'Do you want to process all files?'
         required: false
-        default: 'Yes - All Files'
+        default: 'No - Only Last Commit Files'
         type: choice
         options:
           - Yes - All Files
