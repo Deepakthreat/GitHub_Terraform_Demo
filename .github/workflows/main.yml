@@ -45,7 +45,7 @@ jobs:
       - name: Update env
         run: |
           echo "CHANGED_FILES=${{ steps.changed-files.outputs.all_modified_files }}" >> "$GITHUB_ENV"
-          echo "FULL_SCAN=${{ github.event.inputs.reason != 'No - Only Last Commit Files' }}" >> "$GITHUB_ENV"
+          echo "FULL_SCAN=false" >> "$GITHUB_ENV"
           echo "API_KEY=${{ secrets.TMIAC_API_KEY }}" >> "$GITHUB_ENV"
           echo "BASE_URL=${{ secrets.BASE_URL }}" >> "$GITHUB_ENV"
 
