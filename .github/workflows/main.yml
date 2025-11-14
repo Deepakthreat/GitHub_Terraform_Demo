@@ -32,7 +32,7 @@ jobs:
           repository: threatModeler/GitLabCLI
           token: ${{ secrets.PAT_TOKEN }}
           path: parser
-          ref: bitbucket
+          ref: github
 
       - name: Get all changed files
         id: changed-files
