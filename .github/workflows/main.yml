@@ -19,15 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout version
-        uses: actions/checkout@v2
+        uses: actions/checkout@v5
 
       - name: Use Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v5
         with:
           node-version: 18
 
       - name: Clone parser repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v5
         with:
           repository: threatModeler/GitLabCLI
           token: ${{ secrets.PAT_TOKEN }}
@@ -36,7 +36,7 @@ jobs:
 
       - name: Get all changed files
         id: changed-files
-        uses: tj-actions/changed-files@v36
+        uses: tj-actions/changed-files@v46
         with:
           separator: ','
           json: true
@@ -54,7 +54,7 @@ jobs:
           node ./parser/main.js
 
       - name: Store logs results as Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: assets-for-download
           path: ./logs/
