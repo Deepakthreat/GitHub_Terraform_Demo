@@ -20,8 +20,6 @@ jobs:
     steps:
       - name: checkout version
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Use Node
         uses: actions/setup-node@v5
@@ -38,7 +36,6 @@ jobs:
 
       - name: Get all changed files
         id: changed-files
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'Yes - All Files') }}
         uses: tj-actions/changed-files@v46
         with:
           separator: ','
@@ -46,30 +43,11 @@ jobs:
           write_output_files: true
 
       - name: Update env
-        env:
-          ALL_MODIFIED: ${{ steps.changed-files.outputs.all_modified_files }}
         run: |
-          {
-            echo "CHANGED_FILES<<EOF"
-            echo "$ALL_MODIFIED"
-            echo "EOF"
-          } >> "$GITHUB_ENV"
-          echo "FULL_SCAN=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'Yes - All Files' }}" >> "$GITHUB_ENV"
+          echo "CHANGED_FILES=${{ steps.changed-files.outputs.all_modified_files }}" >> "$GITHUB_ENV"
+          echo "FULL_SCAN=false" >> "$GITHUB_ENV"
           echo "API_KEY=${{ secrets.TMIAC_API_KEY }}" >> "$GITHUB_ENV"
           echo "BASE_URL=${{ secrets.BASE_URL }}" >> "$GITHUB_ENV"
-
-      - name: Log scan selection
-        env:
-          REASON: ${{ github.event.inputs.reason }}
-          CF_OUTCOME: ${{ steps.changed-files.outcome }}
-          CF_RAW_OUTPUT: ${{ steps.changed-files.outputs.all_modified_files }}
-        run: |
-          echo "Event name              : ${{ github.event_name }}"
-          echo "Selected option (reason): ${REASON:-<empty - push event>}"
-          echo "changed-files step      : $CF_OUTCOME"
-          echo "changed-files raw output: $CF_RAW_OUTPUT"
-          echo "FULL_SCAN (env)         : $FULL_SCAN"
-          echo "CHANGED_FILES (env)     : $CHANGED_FILES"
 
       - name: Run parser
         run: |
