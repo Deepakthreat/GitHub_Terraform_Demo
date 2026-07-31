@@ -32,8 +32,8 @@ jobs:
           repository: threatModeler/GitLabCLI
           token: ${{ secrets.PAT_TOKEN }}
           path: parser
-          ref: bitbucket
-
+          ref: bitbucket_clone_before_Cfn_support
+          
       - name: Get all changed files
         id: changed-files
         uses: tj-actions/changed-files@v46
