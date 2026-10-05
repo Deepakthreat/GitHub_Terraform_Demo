@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: checkout version
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Use Node
         uses: actions/setup-node@v5
@@ -33,19 +35,21 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           path: parser
           ref: bitbucket_clone_before_Cfn_support
-          
-      - name: Get all changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v46
-        with:
-          separator: ','
-          json: true
-          write_output_files: true
 
       - name: Update env
+        env:
+          FULL_SCAN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'Yes - All Files' }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          echo "CHANGED_FILES=${{ steps.changed-files.outputs.all_modified_files }}" >> "$GITHUB_ENV"
-          echo "FULL_SCAN=false" >> "$GITHUB_ENV"
+          if [ "$FULL_SCAN" = "true" ]; then
+            FILES=$(git ls-files)                                                   # all tracked files
+          elif [ -n "$BEFORE_SHA" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            FILES=$(git diff --name-only --diff-filter=ACMRD "$BEFORE_SHA" HEAD)    # push: same range tj-actions used
+          else
+            FILES=$(git diff --name-only --diff-filter=ACMRD HEAD~1 HEAD 2>/dev/null || git ls-files)  # dispatch "last commit", force-push, first push
+          fi
+          echo "CHANGED_FILES=$(printf '%s\n' "$FILES" | sed '/^$/d' | jq -R . | jq -cs .)" >> "$GITHUB_ENV"
+          echo "FULL_SCAN=$FULL_SCAN" >> "$GITHUB_ENV"
           echo "API_KEY=${{ secrets.TMIAC_API_KEY }}" >> "$GITHUB_ENV"
           echo "BASE_URL=${{ secrets.BASE_URL }}" >> "$GITHUB_ENV"
 
