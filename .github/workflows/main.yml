@@ -1,31 +1,38 @@
----
 name: IAC Assist Terraform Action
+
 on:
   workflow_dispatch:
     inputs:
       reason:
-        description: Do you want to process all files?
+        description: "Do you want to process all files?"
         required: false
-        default: No - Only Last Commit Files
+        default: "No - Only Last Commit Files"
         type: choice
         options:
-          - Yes - All Files
-          - No - Only Last Commit Files
+          - "Yes - All Files"
+          - "No - Only Last Commit Files"
+
   push:
     branches:
       - master
       - main
+
 jobs:
   analysis:
     permissions: write-all
     runs-on: ubuntu-latest
+
     steps:
-      - name: checkout version
+      - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Use Node
         uses: actions/setup-node@v5
         with:
           node-version: 18
+
       - name: Clone parser repo
         uses: actions/checkout@v5
         with:
@@ -33,71 +40,82 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           path: parser
           ref: bitbucket_clone_before_Cfn_support
-      - name: Get all changed files (git)
-        id: changed-files
-        env: null
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          PROCESS_ALL: ${{ github.event.inputs.reason }}
-        run: >
-  set -euo pipefail
 
-  git config core.quotepath off
+      - name: Get all changed files
+        id: changed-files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PROCESS_ALL: ${{ github.event.inputs.reason }}
+        run: |
+          set -euo pipefail
 
-  HEAD_SHA=$(git rev-parse HEAD)
+          git config core.quotepath off
 
+          HEAD_SHA=$(git rev-parse HEAD)
 
-  if [[ "$EVENT_NAME" == "workflow_dispatch" && "$PROCESS_ALL" == "Yes - All Files" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$PROCESS_ALL" == "Yes - All Files" ]]; then
+            git ls-files -z > /tmp/files.z
+          else
+            ZERO_SHA="0000000000000000000000000000000000000000"
 
-  # All tracked files in the repo (optional - see note below)
-    git ls-files -z > /tmp/files.z
-  else
+            if [[ "$EVENT_NAME" == "push" \
+              && -n "${BEFORE_SHA:-}" \
+              && "$BEFORE_SHA" != "$ZERO_SHA" \
+              && "$(git cat-file -t "$BEFORE_SHA" 2>/dev/null || true)" == "commit" ]]; then
 
-  # Pick the base commit
-    ZERO_SHA="0000000000000000000000000000000000000000"
-    if [[ "$EVENT_NAME" == "push" \
-           && -n "$BEFORE_SHA" && "$BEFORE_SHA" != "$ZERO_SHA" \
-           && $(git cat-file -t "$BEFORE_SHA" 2>/dev/null) == "commit" ]]; then
-        BASE_SHA="$BEFORE_SHA"
-    elif git rev-parse --verify -q "HEAD^" >/dev/null; then
-      BASE_SHA=$(git rev-parse HEAD^)             # fallback: previous commit
-    else
-     BASE_SHA=$(git hash-object -t tree /dev/null)   # first commit: empty tree
-     fi
-     echo "Comparing $BASE_SHA..$HEAD_SHA"
+              BASE_SHA="$BEFORE_SHA"
 
-     # ACMR = Added, Copied, Modified, Renamed (same as all_modified_files)
-     git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" > /tmp/files.z
-     fi
+            elif git rev-parse --verify -q "HEAD^" >/dev/null; then
+              BASE_SHA=$(git rev-parse HEAD^)
 
-   # Compact JSON array, e.g. ["a/b.tf","c.tf"]
-   JSON=$(jq -R -s -c 'split("\u0000") | map(select(length > 0))' < /tmp/files.z)
-   # Comma-separated version (the separator: ',' variant)
-   CSV=$(jq -r 'join(",")' <<< "$JSON")
+            else
+              BASE_SHA=$(git hash-object -t tree /dev/null)
+            fi
 
-   echo "all_modified_files=$JSON" >> "$GITHUB_OUTPUT"
-   
-   # Equivalent of write_output_files: true
-   mkdir -p .github/outputs
-   echo -n "$JSON" > .github/outputs/all_modified_files.json
-   echo -n "$CSV"  > .github/outputs/all_modified_files.txt
-   echo "Changed files: $JSON"
-  - name: Update env
-   env:
-    ALL_MODIFIED_FILES: ${{ steps.changed-files.outputs.all_modified_files }}
-  run: |
-   echo "CHANGED_FILES=$ALL_MODIFIED_FILES" >> "$GITHUB_ENV"          
-   echo "FULL_SCAN=false" >> "$GITHUB_ENV"
-   echo "API_KEY=${{ secrets.TMIAC_API_KEY }}" >> "$GITHUB_ENV"
-   echo "BASE_URL=${{ secrets.BASE_URL }}" >> "$GITHUB_ENV"
-   - name: Run parser
-  run: |
+            echo "Comparing $BASE_SHA..$HEAD_SHA"
 
-  node ./parser/main.js
+            # ACMR = Added, Copied, Modified, Renamed
+            git diff \
+              --name-only \
+              -z \
+              --diff-filter=ACMR \
+              "$BASE_SHA" \
+              "$HEAD_SHA" > /tmp/files.z
+          fi
 
-  - name: Store logs results as Build Artifact
+          # JSON array example:
+          # ["folder/file1.tf","folder/file2.tf"]
+          JSON=$(jq -R -s -c \
+            'split("\u0000") | map(select(length > 0))' \
+            < /tmp/files.z)
 
-  uses: actions/upload-artifact@v6
-   with:
-   name: assets-for-download
-   path: ./logs/
+          CSV=$(jq -r 'join(",")' <<< "$JSON")
+
+          echo "all_modified_files=$JSON" >> "$GITHUB_OUTPUT"
+
+          mkdir -p .github/outputs
+
+          echo -n "$JSON" > .github/outputs/all_modified_files.json
+          echo -n "$CSV" > .github/outputs/all_modified_files.txt
+
+          echo "Changed files: $JSON"
+
+      - name: Update env
+        env:
+          ALL_MODIFIED_FILES: ${{ steps.changed-files.outputs.all_modified_files }}
+        run: |
+          echo "CHANGED_FILES=$ALL_MODIFIED_FILES" >> "$GITHUB_ENV"
+          echo "FULL_SCAN=false" >> "$GITHUB_ENV"
+          echo "API_KEY=${{ secrets.TMIAC_API_KEY }}" >> "$GITHUB_ENV"
+          echo "BASE_URL=${{ secrets.BASE_URL }}" >> "$GITHUB_ENV"
+
+      - name: Run parser
+        run: |
+          node ./parser/main.js
+
+      - name: Store logs results as Build Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: assets-for-download
+          path: ./logs/
